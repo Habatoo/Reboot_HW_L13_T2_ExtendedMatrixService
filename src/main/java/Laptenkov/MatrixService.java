@@ -1,19 +1,13 @@
 package Laptenkov;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
 
 /**
- * Реализовать метод sum в классе MatrixService.
- * Данный метод находит сумму элементов в двумерном массиве.
- * Метод sum позволяет вычислять сумму с использованием nthreads потоков.
- * За счет этого достигается повышение производительности.
- *
- * Сигнатура метода:
- * int sum(int[][] matrix, int nthreads)
- * Метод sum декомпозирует работу путем запуска задач ColumnSummator,
- * которые реализуют интерфейс Callable<Integer> Задача ColumnSummator
- * суммирует элементы матрицы в определенном диапазоне столбцов.
+ * Класс {@link MatrixService} для суммирования элементов
+ * матрицы.
+ * @author habatoo.
  *
  * Критерии приемки:
  *     Декомпозированные задачи ColumnSummator запускать в ExecutorService.
@@ -23,7 +17,9 @@ import java.util.concurrent.ExecutorService;
 public class MatrixService {
 
     /**
-     * Iterates over each column and calculates sum of elements
+     * Внутрений класс {@link ColumnSummator}
+     * для итерирования по колонкам переданной матрицы
+     * и расчета суммы элементов.
      */
     private static class ColumnSummator implements Callable<Integer> {
 
@@ -32,25 +28,46 @@ public class MatrixService {
         private int[][] matrix;
 
         /**
-         * Constructor
+         * Конструктор объекта {@link ColumnSummator} с полным перечнем
+         * параметров.
          *
-         * @param fromColumn - column index start with
-         * @param toColumn   - to column index. You should process columns strong before column with index toColumn
-         * @param matrix     - matrix
+         * @param fromColumn стартовая колонка матрицы, с которой начинается суммирование
+         * @param toColumn   конечная колонка матрицы, на которой заканчивается суммирование,
+         *                   суммирование продолжается строго после колонки с индексом toColumn
+         * @param matrix     матрица для суммирования
          */
         public ColumnSummator(int fromColumn, int toColumn, int[][] matrix) {
-            // should be implemented
+            this.fromColumn = fromColumn;
+            this.toColumn = toColumn;
+            this.matrix = matrix;
         }
 
+        /**
+         * Метод {@link ColumnSummator#call()} объекта {@link ColumnSummator}
+         * реализует логику суммирования элементов двумерной марицы.
+         */
         @Override
         public Integer call() {
-            // should be implemented
-            return null;
+            Integer sum = 0;
+            for (; fromColumn <= toColumn; fromColumn++) {
+                for (int j = 0; j < matrix.length; j++) {
+                    sum = sum + matrix[j][fromColumn];
+                }
+            }
+            return sum;
         }
     }
 
     /**
-     * Get sum of matrix elements. You should parallel work between several threads
+     * Метод {@link ColumnSummator#sum(int[][], int)} объекта {@link ColumnSummator}
+     * находит сумму элементов в двумерном массиве.
+     * Метод sum позволяет вычислять сумму с использованием nthreads потоков.
+     * За счет этого достигается повышение производительности.
+     * Сигнатура метода:
+     * int sum(int[][] matrix, int nthreads)
+     * Метод sum декомпозирует работу путем запуска задач ColumnSummator,
+     * которые реализуют интерфейс Callable<Integer> Задача ColumnSummator
+     * суммирует элементы матрицы в определенном диапазоне столбцов.
      *
      * @param matrix   - matrix
      * @param nthreads - threads count. It is guarantee that number of matrix column is greater than nthreads.
@@ -58,12 +75,44 @@ public class MatrixService {
      */
     public int sum(int[][] matrix, int nthreads) {
 
-        ExecutorService executorService;
+        if (matrix.length == 0) {
+            return 0;
+        }
 
-        // create threads and divide work between them
-        // should be implemented
+        ExecutorService executorService = Executors.newFixedThreadPool(nthreads);
+        List<ColumnSummator> columnSummaters = new ArrayList<>();
+
+        int numberOfParts = matrix.length / nthreads;
+        int fromColumn = 0;
+        int toColumn = fromColumn + numberOfParts - 1;
+
+        for (int i = 0; i < nthreads; i++) {
+            ColumnSummator columnSummator = new ColumnSummator(
+                    fromColumn,
+                    toColumn,
+                    matrix);
+
+            columnSummaters.add(columnSummator);
+
+            fromColumn = toColumn + 1;
+            if (i == nthreads - 2) {
+                toColumn = matrix[0].length - 1;
+            } else {
+                toColumn = fromColumn + numberOfParts - 1;
+            }
+        }
 
         int sum = 0;
+        for (ColumnSummator columnSummater : columnSummaters) {
+            try {
+                sum = sum + executorService.submit(columnSummater).get();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            }
+        }
+
         return sum;
     }
 }
