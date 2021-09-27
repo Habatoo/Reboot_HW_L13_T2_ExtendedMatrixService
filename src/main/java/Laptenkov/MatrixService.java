@@ -80,7 +80,7 @@ public class MatrixService {
         }
 
         ExecutorService executorService = Executors.newFixedThreadPool(nthreads);
-        List<ColumnSummator> columnSummaters = new ArrayList<>();
+        List<Future> futureList = new ArrayList<>();
 
         int numberOfParts = matrix.length / nthreads;
         int fromColumn = 0;
@@ -92,7 +92,7 @@ public class MatrixService {
                     toColumn,
                     matrix);
 
-            columnSummaters.add(columnSummator);
+            futureList.add(executorService.submit(columnSummator));
 
             fromColumn = toColumn + 1;
             if (i == nthreads - 2) {
@@ -102,17 +102,18 @@ public class MatrixService {
             }
         }
 
+
         int sum = 0;
-        for (ColumnSummator columnSummater : columnSummaters) {
+        for (Future future: futureList) {
             try {
-                sum = sum + executorService.submit(columnSummater).get();
+                sum = sum + (Integer) future.get();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (ExecutionException e) {
                 e.printStackTrace();
             }
         }
-
+        executorService.shutdown();
         return sum;
     }
 }
